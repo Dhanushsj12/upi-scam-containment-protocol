@@ -1,17 +1,26 @@
 const mongoose = require("mongoose");
 
 const transactionSchema = new mongoose.Schema({
-  transactionId: { type: String, required: true },
-  userId: { type: String, required: true },
-  receiverId: { type: String, required: true },
-  amount: { type: Number, required: true },
-  riskScore: { type: Number },
+  transactionId: String,
+  userId: String,
+  receiverId: String,
+  amount: Number,
+  riskScore: Number,
   status: {
     type: String,
-    enum: ["INITIATED", "SOFT_HOLD", "COMPLETED", "REVERSED"],
-    default: "INITIATED"
-  },
-  createdAt: { type: Date, default: Date.now }
-});
+    enum: [
+      "PENDING",
+      "COMPLETED",
+      "SOFT_HOLD",
+      "RELEASED",
+      "REVERSED",
+      "FLAGGED"
+    ],
+    default: "PENDING"
+  }
+}, { timestamps: true });
 
-module.exports = mongoose.model("Transaction", transactionSchema);
+module.exports =
+  mongoose.models.Transaction ||
+  mongoose.model("Transaction", transactionSchema);
+

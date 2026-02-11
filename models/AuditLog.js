@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const crypto = require("crypto");
 
 const auditSchema = new mongoose.Schema({
   transactionId: String,
@@ -8,12 +7,6 @@ const auditSchema = new mongoose.Schema({
   hash: String
 });
 
-auditSchema.pre("save", function (next) {
-  this.hash = crypto
-    .createHash("sha256")
-    .update(this.transactionId + this.action + this.timestamp)
-    .digest("hex");
-  next();
-});
-
-module.exports = mongoose.model("AuditLog", auditSchema);
+module.exports =
+  mongoose.models.AuditLog ||
+  mongoose.model("AuditLog", auditSchema);

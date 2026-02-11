@@ -1,16 +1,14 @@
 require("dotenv").config();
-console.log("MONGO_URI:", process.env.MONGO_URI);
+
 const express = require("express");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
 const cors = require("cors");
 const mongoose = require("mongoose");
 
-const Transaction = require("./models/Transaction");
-const AuditLog = require("./models/AuditLog");
-const calculateRisk = require("./utils/riskScore");
-
 const app = express();
+
+/* ------------------ MIDDLEWARE ------------------ */
 app.use(express.json());
 app.use(cors());
 
@@ -26,22 +24,35 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET
 });
 
+/* ------------------ MODELS ------------------ */
+const Transaction = require("./models/Transaction");
+const AuditLog = require("./models/AuditLog");
+
+/* ------------------ UTILS ------------------ */
+const calculateRisk = require("./utils/riskScore");
+
+/* ------------------ ROUTES (DAY 3 STRUCTURE) ------------------ */
+app.use("/api/admin", require("./routes/adminRoutes"));
+app.use("/api/transactions", require("./routes/transactionRoutes"));
+app.use("/webhook", require("./routes/webhookRoutes"));
+
 /* ------------------ HEALTH CHECK ------------------ */
 app.get("/", (req, res) => {
-  res.json({ status: "UPI Scam Containment Backend Running" });
+  res.json({ status: "UPI Scam Containment Backend Running 🚀" });
 });
+
+/* ===========================================================
+   ============================================================ */
 
 /* ------------------ CREATE ORDER + CONTAINMENT ------------------ */
 app.post("/create-order", async (req, res) => {
   try {
     const { userId, receiverId, amount } = req.body;
 
-    // Simulated behavior flags (later replace with real logic)
     const isNewReceiver = true;
     const isOddTime = new Date().getHours() < 6;
     const rapidTransfer = false;
 
-    // Calculate risk score
     const riskScore = calculateRisk(
       amount,
       isNewReceiver,
@@ -49,21 +60,16 @@ app.post("/create-order", async (req, res) => {
       rapidTransfer
     );
 
-    // Decide transaction status
     let status = "COMPLETED";
     if (riskScore >= 70) status = "SOFT_HOLD";
 
-    // Create Razorpay order
     const order = await razorpay.orders.create({
-      amount: amount, // paise
+      amount: amount,
       currency: "INR",
       receipt: "rcpt_" + Date.now(),
-      notes: {
-        riskScore
-      }
+      notes: { riskScore }
     });
 
-    // Store transaction in DB
     const tx = await Transaction.create({
       transactionId: order.id,
       userId,
@@ -73,11 +79,19 @@ app.post("/create-order", async (req, res) => {
       status
     });
 
-    // Audit log
-    await AuditLog.create({
-      transactionId: tx.transactionId,
-      action: `Transaction ${status}`
-    });
+   const crypto = require("crypto");
+
+const hash = crypto
+  .createHash("sha256")
+  .update(tx.transactionId + status + Date.now())
+  .digest("hex");
+
+await AuditLog.create({
+  transactionId: tx.transactionId,
+  action: `Transaction ${status}`,
+  hash
+});
+
 
     res.json({
       message: "Order created",
@@ -86,10 +100,12 @@ app.post("/create-order", async (req, res) => {
       riskScore,
       status
     });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Order creation failed" });
-  }
+  console.error("Order Error:", err);
+  res.status(500).json({ error: err.message });
+}
+
 });
 
 /* ------------------ USER CONFIRMS TRANSACTION ------------------ */
@@ -151,6 +167,11 @@ app.post("/verify-payment", (req, res) => {
 });
 
 /* ------------------ START SERVER ------------------ */
-app.listen(process.env.PORT, () => {
-  console.log(`Server running on port ${process.env.PORT}`);
+const PORT = process.env.PORT || 8000;
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+app.get("/create-order-test", (req, res) => {
+  res.json({ message: "Route is working" });
 });
