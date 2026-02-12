@@ -1,26 +1,17 @@
 const mongoose = require("mongoose");
 
 const transactionSchema = new mongoose.Schema({
-  transactionId: String,
   userId: String,
   receiverId: String,
   amount: Number,
   riskScore: Number,
   status: {
     type: String,
-    enum: [
-      "PENDING",
-      "COMPLETED",
-      "SOFT_HOLD",
-      "RELEASED",
-      "REVERSED",
-      "FLAGGED"
-    ],
-    default: "PENDING"
+    enum: ["COMPLETED", "SOFT_HOLD", "REVERSED"],
+    default: "COMPLETED"
   }
 }, { timestamps: true });
 
 module.exports =
   mongoose.models.Transaction ||
   mongoose.model("Transaction", transactionSchema);
-

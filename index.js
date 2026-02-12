@@ -5,12 +5,22 @@ const Razorpay = require("razorpay");
 const crypto = require("crypto");
 const cors = require("cors");
 const mongoose = require("mongoose");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 
 const app = express();
 
 /* ------------------ MIDDLEWARE ------------------ */
 app.use(express.json());
 app.use(cors());
+app.use(helmet());
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100
+});
+
+app.use(limiter);
 
 /* ------------------ DATABASE CONNECTION ------------------ */
 mongoose
@@ -24,124 +34,14 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET
 });
 
-/* ------------------ MODELS ------------------ */
-const Transaction = require("./models/Transaction");
-const AuditLog = require("./models/AuditLog");
-
-/* ------------------ UTILS ------------------ */
-const calculateRisk = require("./utils/riskScore");
-
-/* ------------------ ROUTES (DAY 3 STRUCTURE) ------------------ */
-app.use("/api/admin", require("./routes/adminRoutes"));
+/* ------------------ ROUTES ------------------ */
 app.use("/api/transactions", require("./routes/transactionRoutes"));
+app.use("/api/admin", require("./routes/adminRoutes"));
 app.use("/webhook", require("./routes/webhookRoutes"));
 
 /* ------------------ HEALTH CHECK ------------------ */
 app.get("/", (req, res) => {
   res.json({ status: "UPI Scam Containment Backend Running 🚀" });
-});
-
-/* ===========================================================
-   ============================================================ */
-
-/* ------------------ CREATE ORDER + CONTAINMENT ------------------ */
-app.post("/create-order", async (req, res) => {
-  try {
-    const { userId, receiverId, amount } = req.body;
-
-    const isNewReceiver = true;
-    const isOddTime = new Date().getHours() < 6;
-    const rapidTransfer = false;
-
-    const riskScore = calculateRisk(
-      amount,
-      isNewReceiver,
-      isOddTime,
-      rapidTransfer
-    );
-
-    let status = "COMPLETED";
-    if (riskScore >= 70) status = "SOFT_HOLD";
-
-    const order = await razorpay.orders.create({
-      amount: amount,
-      currency: "INR",
-      receipt: "rcpt_" + Date.now(),
-      notes: { riskScore }
-    });
-
-    const tx = await Transaction.create({
-      transactionId: order.id,
-      userId,
-      receiverId,
-      amount,
-      riskScore,
-      status
-    });
-
-   const crypto = require("crypto");
-
-const hash = crypto
-  .createHash("sha256")
-  .update(tx.transactionId + status + Date.now())
-  .digest("hex");
-
-await AuditLog.create({
-  transactionId: tx.transactionId,
-  action: `Transaction ${status}`,
-  hash
-});
-
-
-    res.json({
-      message: "Order created",
-      transactionId: tx._id,
-      razorpayOrderId: order.id,
-      riskScore,
-      status
-    });
-
-  } catch (err) {
-  console.error("Order Error:", err);
-  res.status(500).json({ error: err.message });
-}
-
-});
-
-/* ------------------ USER CONFIRMS TRANSACTION ------------------ */
-app.post("/confirm/:id", async (req, res) => {
-  const tx = await Transaction.findById(req.params.id);
-  if (!tx || tx.status !== "SOFT_HOLD") {
-    return res.status(400).json({ message: "Invalid transaction" });
-  }
-
-  tx.status = "COMPLETED";
-  await tx.save();
-
-  await AuditLog.create({
-    transactionId: tx.transactionId,
-    action: "User confirmed transaction"
-  });
-
-  res.json({ message: "Transaction completed successfully" });
-});
-
-/* ------------------ USER REPORTS FRAUD ------------------ */
-app.post("/report-fraud/:id", async (req, res) => {
-  const tx = await Transaction.findById(req.params.id);
-  if (!tx || tx.status !== "SOFT_HOLD") {
-    return res.status(400).json({ message: "Invalid transaction" });
-  }
-
-  tx.status = "REVERSED";
-  await tx.save();
-
-  await AuditLog.create({
-    transactionId: tx.transactionId,
-    action: "Transaction reversed due to fraud"
-  });
-
-  res.json({ message: "Transaction reversed and user protected" });
 });
 
 /* ------------------ VERIFY PAYMENT SIGNATURE ------------------ */
@@ -171,7 +71,4 @@ const PORT = process.env.PORT || 8000;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-});
-app.get("/create-order-test", (req, res) => {
-  res.json({ message: "Route is working" });
 });

@@ -1,21 +1,32 @@
-const Transaction = require('../models/Transaction');
+const Transaction = require("../models/Transaction");
+const AuditLog = require("../models/AuditLog");
+const crypto = require("crypto");
 
-async function applySoftHold(transactionId) {
-  const txn = await Transaction.findById(transactionId);
-  if (!txn) return;
-
-  txn.status = 'SOFT_HOLD';
-  await txn.save();
-
+exports.scheduleAutoRelease = (transactionId) => {
   setTimeout(async () => {
-    const updatedTxn = await Transaction.findById(transactionId);
+    try {
+      const tx = await Transaction.findById(transactionId);
 
-    if (updatedTxn.status === 'SOFT_HOLD') {
-      updatedTxn.status = 'RELEASED';
-      await updatedTxn.save();
-      console.log("Funds Released");
+      if (tx && tx.status === "SOFT_HOLD") {
+        tx.status = "COMPLETED";
+        await tx.save();
+
+        const hash = crypto
+          .createHash("sha256")
+          .update(tx._id + "AUTO_RELEASE" + Date.now())
+          .digest("hex");
+
+        await AuditLog.create({
+          transactionId: tx._id,
+          action: "Auto released after soft hold",
+          hash
+        });
+
+        console.log("Auto Released:", tx._id);
+      }
+
+    } catch (err) {
+      console.error("Auto release error:", err);
     }
-  }, 10 * 60 * 1000);
-}
-
-module.exports = { applySoftHold };
+  }, 30 * 1000); // ⚠️ 30 sec for testing (change to 10*60*1000 later)
+};
