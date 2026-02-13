@@ -1,10 +1,12 @@
-const crypto = require("crypto");
-const Transaction = require("../models/Transaction");
-const AuditLog = require("../models/AuditLog");
+const Razorpay = require("razorpay");
+const Transaction = require("../models/transaction");
 const calculateRisk = require("../utils/riskScore");
-const { scheduleAutoRelease } = require("../services/softHoldService");
 
-/* ================= CREATE TRANSACTION ================= */
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET
+});
+
 exports.createTransaction = async (req, res) => {
   try {
     const { userId, receiverId, amount } = req.body;
@@ -20,82 +22,64 @@ exports.createTransaction = async (req, res) => {
       rapidTransfer
     );
 
-    let status = "COMPLETED";
-    if (riskScore >= 70) status = "SOFT_HOLD";
+    let status = riskScore >= 70 ? "HOLD" : "COMPLETED";
+
+    const order = await razorpay.orders.create({
+      amount: amount * 100,
+      currency: "INR"
+    });
 
     const transaction = await Transaction.create({
       userId,
       receiverId,
       amount,
       riskScore,
+      status,
+      razorpayOrderId: order.id
+    });
+
+    res.json({
+      message: "Order created",
+      orderId: order.id,
+      transactionId: transaction._id,
       status
     });
 
-    if (status === "SOFT_HOLD") {
-      scheduleAutoRelease(transaction._id);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Order creation failed" });
+  }
+};
+
+exports.savePayment = async (req, res) => {
+  try {
+    const { orderId, paymentId } = req.body;
+
+    const tx = await Transaction.findOne({ razorpayOrderId: orderId });
+
+    if (!tx) {
+      return res.status(404).json({ message: "Transaction not found" });
     }
 
-    const hash = crypto
-      .createHash("sha256")
-      .update(transaction._id + status + Date.now())
-      .digest("hex");
+    tx.razorpayPaymentId = paymentId;
+    await tx.save();
 
-    await AuditLog.create({
-      transactionId: transaction._id,
-      action: `Transaction ${status}`,
-      hash
-    });
+    // 🔥 ADD THIS LINE HERE
+    console.log("Updated TX:", tx);
 
-    res.status(201).json(transaction);
+    res.json({ message: "Payment recorded successfully" });
 
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server Error" });
+    res.status(500).json({ message: "Save payment failed" });
   }
 };
 
-/* ================= CONFIRM ================= */
-exports.confirmTransaction = async (req, res) => {
-  try {
-    const tx = await Transaction.findById(req.params.id);
 
-    if (!tx) return res.status(404).json({ message: "Not found" });
-
-    if (tx.status !== "SOFT_HOLD") {
-      return res.status(400).json({
-        message: "Transaction already processed"
-      });
-    }
-
-    tx.status = "COMPLETED";
-    await tx.save();
-
-    res.json({ message: "Transaction confirmed" });
-
-  } catch (error) {
-    res.status(500).json({ message: "Server Error" });
-  }
+exports.capturePayment = async (req, res) => {
+  res.json({ message: "capture working" });
 };
 
-/* ================= REPORT FRAUD ================= */
-exports.reportFraud = async (req, res) => {
-  try {
-    const tx = await Transaction.findById(req.params.id);
-
-    if (!tx) return res.status(404).json({ message: "Not found" });
-
-    if (tx.status !== "SOFT_HOLD") {
-      return res.status(400).json({
-        message: "Cannot reverse this transaction"
-      });
-    }
-
-    tx.status = "REVERSED";
-    await tx.save();
-
-    res.json({ message: "Transaction reversed" });
-
-  } catch (error) {
-    res.status(500).json({ message: "Server Error" });
-  }
+exports.refundPayment = async (req, res) => {
+  res.json({ message: "refund working" });
 };
