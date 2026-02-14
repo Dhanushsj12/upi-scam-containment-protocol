@@ -1,17 +1,22 @@
 const mongoose = require("mongoose");
 
-const transactionSchema = new mongoose.Schema({
-  userId: String,
-  receiverId: String,
-  amount: Number,
-  riskScore: Number,
-  status: {
-    type: String,
-    enum: ["HOLD", "COMPLETED", "REVERSED"],
-    default: "HOLD"
+const transactionSchema = new mongoose.Schema(
+  {
+    userId: { type: String, required: true },
+    amount: { type: Number, required: true },
+    riskScore: { type: Number, default: 0 },
+
+    status: {
+      type: String,
+      enum: ["PENDING", "HOLD", "AUTHORIZED", "COMPLETED", "REVERSED"],
+      default: "PENDING",
+    },
+
+    razorpayOrderId: String,
+    razorpayPaymentId: String,
+    razorpaySignature: String,
   },
-  razorpayOrderId: String,
-  razorpayPaymentId: String
-}, { timestamps: true });
+  { timestamps: true }
+);
 
 module.exports = mongoose.model("Transaction", transactionSchema);

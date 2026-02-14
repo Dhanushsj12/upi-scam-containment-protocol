@@ -1,12 +1,14 @@
 const mongoose = require("mongoose");
 
-const auditSchema = new mongoose.Schema({
-  transactionId: String,
-  action: String,
-  timestamp: { type: Date, default: Date.now },
-  hash: String
-});
+const auditLogSchema = new mongoose.Schema(
+  {
+    transactionId: String,
+    action: String,
+    previousStatus: String,
+    newStatus: String,
+    actor: { type: String, default: "system" },
+  },
+  { timestamps: true }
+);
 
-module.exports =
-  mongoose.models.AuditLog ||
-  mongoose.model("AuditLog", auditSchema);
+module.exports = mongoose.model("AuditLog", auditLogSchema);

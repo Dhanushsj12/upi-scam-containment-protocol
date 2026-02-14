@@ -1,32 +1,59 @@
-const Transaction = require('../models/Transaction');
+const Transaction = require("../models/transaction");
+const AuditLog = require("../models/AuditLog");
 
 exports.handleWebhook = async (req, res) => {
   try {
+    console.log("Webhook received:", req.body);
+
     const event = req.body.event;
 
-    if (event === 'payment.captured') {
-      const payment = req.body.payload?.payment?.entity;
-
-      if (!payment) {
-        return res.status(400).json({ message: "Invalid payload" });
-      }
-
-      const txn = await Transaction.findOne({
-        transactionId: payment.order_id
-      });
-
-      if (!txn) {
-        return res.status(404).json({ message: "Transaction not found" });
-      }
-
-      txn.status = "COMPLETED";
-      await txn.save();
+    if (!req.body.payload || !req.body.payload.payment) {
+      return res.status(400).json({ message: "Invalid webhook payload" });
     }
 
-    res.status(200).json({ message: "Webhook processed" });
+    const payment = req.body.payload.payment.entity;
+
+    const transaction = await Transaction.findOne({
+      razorpayOrderId: payment.order_id
+    });
+
+    if (!transaction) {
+      return res.status(404).json({ message: "Transaction not found" });
+    }
+
+    const prevStatus = transaction.status;
+
+    if (event === "payment.captured") {
+      transaction.status = "AUTHORIZED";
+      transaction.razorpayPaymentId = payment.id;
+      await transaction.save();
+
+      await AuditLog.create({
+        transactionId: transaction._id,
+        action: "AUTO_CAPTURED",
+        previousStatus: prevStatus,
+        newStatus: "AUTHORIZED",
+        actor: "system"
+      });
+    }
+
+    if (event === "payment.failed") {
+      transaction.status = "REVERSED";
+      await transaction.save();
+
+      await AuditLog.create({
+        transactionId: transaction._id,
+        action: "PAYMENT_FAILED",
+        previousStatus: prevStatus,
+        newStatus: "REVERSED",
+        actor: "system"
+      });
+    }
+
+    res.json({ status: "ok" });
 
   } catch (err) {
-    console.error("Webhook error:", err);
-    res.status(500).json({ error: err.message });
+    console.error("WEBHOOK ERROR:", err);
+    res.status(500).json({ message: "Webhook error", error: err.message });
   }
 };

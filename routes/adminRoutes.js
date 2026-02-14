@@ -1,11 +1,13 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const adminController = require('../controllers/adminController');
+const {
+  getHolds,
+  approveTransaction,
+  rejectTransaction,
+} = require("../controllers/adminController");
 
-router.get('/transactions', adminController.getAllTransactions);
-router.get('/transactions/:id', adminController.getTransactionById);
-
-router.post('/flag/:id', adminController.flagTransaction);
-router.post('/release/:id', adminController.releaseTransaction);
+router.get("/holds", getHolds);
+router.post("/approve/:id", approveTransaction);
+router.post("/reject/:id", rejectTransaction);
 
 module.exports = router;
