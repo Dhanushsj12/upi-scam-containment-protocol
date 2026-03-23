@@ -1,39 +1,527 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <title>UPI Fraud Detection Payment</title>
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #f5f4f0;
+            --surface: #ffffff;
+            --surface2: #f0efe9;
+            --border: #e2e0d8;
+            --text: #1a1916;
+            --muted: #8a8880;
+            --muted2: #c5c3bb;
+            --accent: #1a1916;
+            --green: #1a9c5b;
+            --green-bg: #e8f7f0;
+            --orange: #d4720a;
+            --orange-bg: #fdf3e3;
+            --red: #c0392b;
+            --red-bg: #fdecea;
+            --blue: #1a5cb8;
+            --blue-bg: #e8f0fb;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        /* Subtle dot pattern */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: radial-gradient(circle, #c5c3bb 1px, transparent 1px);
+            background-size: 28px 28px;
+            opacity: 0.35;
+            pointer-events: none;
+        }
+
+        .wrapper {
+            width: 100%;
+            max-width: 460px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ── HEADER ── */
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .brand-icon {
+            width: 40px; height: 40px;
+            background: var(--accent);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .brand-icon svg { width: 22px; height: 22px; }
+
+        .brand-name {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+            color: var(--text);
+        }
+
+        .brand-name span {
+            color: var(--muted);
+            font-weight: 400;
+        }
+
+        .header h1 {
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 6px;
+        }
+
+        .header p {
+            font-size: 14px;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        /* ── CARD ── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04);
+            animation: fadeUp 0.5s ease forwards;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .card-body { padding: 32px; }
+
+        /* ── FORM ── */
+        .form-group { margin-bottom: 18px; }
+
+        .form-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 7px;
+        }
+
+        .input-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 14px;
+            color: var(--muted2);
+            display: flex;
+        }
+
+        .input-icon svg { width: 15px; height: 15px; }
+
+        .form-input {
+            width: 100%;
+            font-family: 'Outfit', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            background: var(--surface2);
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px 12px 40px;
+            color: var(--text);
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus {
+            border-color: var(--accent);
+            background: var(--surface);
+            box-shadow: 0 0 0 3px rgba(26,25,22,0.07);
+        }
+
+        .form-input::placeholder { color: var(--muted2); font-weight: 400; }
+
+        /* Amount field special */
+        .amount-prefix {
+            position: absolute;
+            left: 14px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--muted);
+        }
+
+        .form-input.amount-input { padding-left: 32px; font-family: 'JetBrains Mono', monospace; }
+
+        /* ── DIVIDER ── */
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 24px 0;
+        }
+
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        .divider span {
+            font-size: 11px;
+            color: var(--muted);
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        /* ── PAY BUTTON ── */
+        .btn-pay {
+            width: 100%;
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            letter-spacing: 0.01em;
+        }
+
+        .btn-pay:hover {
+            background: #2d2c28;
+            box-shadow: 0 8px 24px rgba(26,25,22,0.2);
+            transform: translateY(-1px);
+        }
+
+        .btn-pay:active { transform: translateY(0); }
+
+        .btn-pay svg { width: 17px; height: 17px; }
+
+        /* ── STATUS BOX ── */
+        .status-box {
+            margin-top: 24px;
+            background: var(--surface2);
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            padding: 16px 18px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.3s;
+        }
+
+        .status-icon {
+            width: 36px; height: 36px;
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            background: var(--surface2);
+        }
+
+        .status-icon svg { width: 18px; height: 18px; }
+
+        .status-content { flex: 1; min-width: 0; }
+
+        .status-label {
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 2px;
+        }
+
+        .status-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Status variants */
+        .status-box.hold   { background: var(--orange-bg); border-color: #f0c070; }
+        .status-box.hold .status-icon { background: var(--orange-bg); color: var(--orange); }
+        .status-box.hold .status-text { color: var(--orange); }
+
+        .status-box.completed { background: var(--green-bg); border-color: #7dccaa; }
+        .status-box.completed .status-icon { background: var(--green-bg); color: var(--green); }
+        .status-box.completed .status-text { color: var(--green); }
+
+        .status-box.reversed { background: var(--red-bg); border-color: #e8a09a; }
+        .status-box.reversed .status-icon { background: var(--red-bg); color: var(--red); }
+        .status-box.reversed .status-text { color: var(--red); }
+
+        .status-box.processing { background: var(--blue-bg); border-color: #90b8e8; }
+        .status-box.processing .status-icon { background: var(--blue-bg); color: var(--blue); }
+        .status-box.processing .status-text { color: var(--blue); }
+
+        /* Spinner */
+        .spinner {
+            width: 18px; height: 18px;
+            border: 2px solid currentColor;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+
+        .processing .spinner { display: block; }
+        .processing .status-icon-svg { display: none; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── ACTION BUTTONS ── */
+        .action-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .btn-action {
+            font-family: 'Outfit', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1.5px solid;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn-action:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .btn-confirm {
+            background: var(--green-bg);
+            border-color: #7dccaa;
+            color: var(--green);
+        }
+
+        .btn-confirm:hover:not(:disabled) {
+            background: #d4f0e4;
+            box-shadow: 0 4px 14px rgba(26,156,91,0.15);
+        }
+
+        .btn-cancel {
+            background: var(--red-bg);
+            border-color: #e8a09a;
+            color: var(--red);
+        }
+
+        .btn-cancel:hover:not(:disabled) {
+            background: #fbd8d6;
+            box-shadow: 0 4px 14px rgba(192,57,43,0.15);
+        }
+
+        .btn-action svg { width: 14px; height: 14px; }
+
+        /* ── CARD FOOTER ── */
+        .card-footer {
+            border-top: 1px solid var(--border);
+            padding: 16px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            background: var(--surface2);
+        }
+
+        .card-footer span {
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .card-footer svg { width: 13px; height: 13px; color: var(--green); }
+
+        /* ── FOOTER ── */
+        .footer {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .powered {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .powered svg { width: 12px; height: 12px; }
+    </style>
 </head>
 <body>
 
-<h2>UPI Payment Test</h2>
+<div class="wrapper">
 
-<input type="text" id="userId" placeholder="User ID" value="user1"><br><br>
-<input type="text" id="receiverId" placeholder="Receiver ID" value="receiver1"><br><br>
-<input type="number" id="amount" placeholder="Amount" value="15000"><br><br>
+    <!-- HEADER -->
+    <div class="header">
+        <div class="brand">
+            <div class="brand-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    <polyline points="9 12 11 14 15 10"/>
+                </svg>
+            </div>
+            <div class="brand-name">Fraud<span>Guard</span></div>
+        </div>
+        <h1>Secure UPI Payment</h1>
+        <p>AI-powered fraud detection on every transaction</p>
+    </div>
 
-<button onclick="startPayment()">Pay Now</button>
+    <!-- CARD -->
+    <div class="card">
+        <div class="card-body">
 
-<h3 id="status">Status: Not Started</h3>
-<button id="confirmBtn" onclick="confirmPayment()">Confirm Payment</button>
-<button id="cancelBtn" onclick="cancelPayment()">Cancel Payment</button>
+            <!-- USER ID -->
+            <div class="form-group">
+                <label class="form-label">User ID</label>
+                <div class="input-wrap">
+                    <span class="input-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </span>
+                    <input class="form-input" type="text" id="userId" placeholder="Enter user ID" value="user1">
+                </div>
+            </div>
+
+            <!-- RECEIVER ID -->
+            <div class="form-group">
+                <label class="form-label">Receiver ID</label>
+                <div class="input-wrap">
+                    <span class="input-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </span>
+                    <input class="form-input" type="text" id="receiverId" placeholder="Enter receiver ID" value="receiver1">
+                </div>
+            </div>
+
+            <!-- AMOUNT -->
+            <div class="form-group">
+                <label class="form-label">Amount</label>
+                <div class="input-wrap">
+                    <span class="amount-prefix">₹</span>
+                    <input class="form-input amount-input" type="number" id="amount" placeholder="0.00" value="15000">
+                </div>
+            </div>
+
+            <div class="divider"><span>Proceed to pay</span></div>
+
+            <!-- PAY BUTTON -->
+            <button class="btn-pay" onclick="startPayment()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                Pay Now via Razorpay
+            </button>
+
+            <!-- STATUS BOX -->
+            <div class="status-box" id="statusBox">
+                <div class="status-icon">
+                    <svg class="status-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <div class="spinner"></div>
+                </div>
+                <div class="status-content">
+                    <div class="status-label">Transaction Status</div>
+                    <div class="status-text" id="status">Not Started</div>
+                </div>
+            </div>
+
+            <!-- CONFIRM / CANCEL -->
+            <div class="action-row">
+                <button class="btn-action btn-confirm" id="confirmBtn" onclick="confirmPayment()" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    Confirm
+                </button>
+                <button class="btn-action btn-cancel" id="cancelBtn" onclick="cancelPayment()" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    Cancel
+                </button>
+            </div>
+
+        </div>
+
+        <!-- CARD FOOTER -->
+        <div class="card-footer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span>256-bit SSL encryption &nbsp;·&nbsp; PCI DSS compliant &nbsp;·&nbsp; Real-time fraud monitoring</span>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+        <div class="powered">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Powered by FraudGuard AI &nbsp;·&nbsp; All transactions monitored
+        </div>
+    </div>
+
+</div>
 
 <script>
 let transactionId = null;
 let orderIdGlobal = null;
 let statusInterval = null;
 
+function setStatus(text, variant) {
+    document.getElementById("status").textContent = text;
+    const box = document.getElementById("statusBox");
+    box.className = 'status-box' + (variant ? ' ' + variant : '');
+}
 
-// ===============================
-// START PAYMENT
-// ===============================
 async function startPayment() {
     try {
         const userId = document.getElementById("userId").value;
         const receiverId = document.getElementById("receiverId").value;
         const amount = document.getElementById("amount").value;
 
-        document.getElementById("status").innerText = "Creating transaction...";
+        setStatus("Creating transaction...", "processing");
 
         const res = await fetch("http://localhost:8000/api/transaction/create", {
             method: "POST",
@@ -47,8 +535,7 @@ async function startPayment() {
         transactionId = data.transactionId;
         orderIdGlobal = data.orderId;
 
-        document.getElementById("status").innerText =
-            "Transaction Created | Risk Score: " + data.riskScore;
+        setStatus("Created · Risk Score: " + data.riskScore, "");
 
         const options = {
             key: "rzp_test_SDtnqeeFeS0ztb",
@@ -57,23 +544,19 @@ async function startPayment() {
             order_id: orderIdGlobal,
 
             handler: async function (response) {
-
-                document.getElementById("status").innerText =
-                    "Payment Authorized. Processing...";
+                setStatus("Payment Authorized. Processing...", "processing");
 
                 const saveRes = await fetch("http://localhost:8000/api/transaction/save-payment", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-        paymentId: response.razorpay_payment_id
-    })
-});
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ paymentId: response.razorpay_payment_id })
+                });
 
-const saveData = await saveRes.json();
-console.log("Save Payment Response:", saveData);
+                const saveData = await saveRes.json();
+                console.log("Save Payment Response:", saveData);
 
-checkStatus();
-startStatusPolling();
+                checkStatus();
+                startStatusPolling();
             }
         };
 
@@ -82,86 +565,63 @@ startStatusPolling();
 
     } catch (error) {
         console.error(error);
-        document.getElementById("status").innerText = "Error starting payment";
+        setStatus("Error starting payment", "reversed");
     }
 }
 
-
-// ===============================
-// STATUS POLLING
-// ===============================
 function startStatusPolling() {
     if (statusInterval) clearInterval(statusInterval);
-
-    statusInterval = setInterval(async () => {
-        await checkStatus();
-    }, 3000);
+    statusInterval = setInterval(async () => { await checkStatus(); }, 3000);
 }
 
-
-// ===============================
-// CHECK STATUS
-// ===============================
 async function checkStatus() {
     if (!transactionId) return;
 
     const res = await fetch(`http://localhost:8000/api/transaction/status/${transactionId}`);
     const data = await res.json();
-
     console.log("Status:", data);
 
-    document.getElementById("status").innerText =
-        "Status: " + data.status + " | Risk Score: " + data.riskScore;
+    const s = data.status;
+    const text = s + " · Risk Score: " + data.riskScore;
 
-    // Enable buttons only when HOLD
-    if (data.status === "HOLD") {
-        document.getElementById("confirmBtn").disabled = false;
-        document.getElementById("cancelBtn").disabled = false;
-    } else {
-        document.getElementById("confirmBtn").disabled = true;
-        document.getElementById("cancelBtn").disabled = true;
-    }
+    let variant = "";
+    if (s === "HOLD")      variant = "hold";
+    if (s === "COMPLETED") variant = "completed";
+    if (s === "REVERSED")  variant = "reversed";
+    if (s === "PROCESSING" || s === "PENDING") variant = "processing";
 
-    if (data.status === "COMPLETED" || data.status === "REVERSED") {
+    setStatus(text, variant);
+
+    const isHold = (s === "HOLD");
+    document.getElementById("confirmBtn").disabled = !isHold;
+    document.getElementById("cancelBtn").disabled = !isHold;
+
+    if (s === "COMPLETED" || s === "REVERSED") {
         clearInterval(statusInterval);
     }
 }
 
-
-// ===============================
-// CONFIRM PAYMENT
-// ===============================
 async function confirmPayment() {
     if (!transactionId) return;
-
     const res = await fetch("http://localhost:8000/api/transaction/confirm", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({ transactionId })
     });
-
     const data = await res.json();
     console.log(data);
-
     startStatusPolling();
 }
 
-
-// ===============================
-// CANCEL PAYMENT
-// ===============================
 async function cancelPayment() {
     if (!transactionId) return;
-
     const res = await fetch("http://localhost:8000/api/transaction/cancel", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({ transactionId })
     });
-
     const data = await res.json();
     console.log(data);
-
     startStatusPolling();
 }
 </script>

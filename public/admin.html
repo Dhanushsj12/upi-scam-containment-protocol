@@ -1,137 +1,818 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <title>Admin Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0b0f;
+            --surface: #111318;
+            --surface2: #181b22;
+            --border: #1f2330;
+            --accent: #e8ff47;
+            --accent2: #47c8ff;
+            --danger: #ff4757;
+            --text: #e8eaf0;
+            --muted: #5a5f72;
+            --muted2: #3a3f52;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Mono', monospace;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Grid noise texture overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                repeating-linear-gradient(0deg, transparent, transparent 39px, var(--border) 39px, var(--border) 40px),
+                repeating-linear-gradient(90deg, transparent, transparent 39px, var(--border) 39px, var(--border) 40px);
+            opacity: 0.18;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ── SIDEBAR ── */
+        .sidebar {
+            position: fixed;
+            top: 0; left: 0;
+            width: 64px;
+            height: 100vh;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px 0;
+            gap: 8px;
+            z-index: 100;
+        }
+
+        .sidebar-logo {
+            width: 36px; height: 36px;
+            background: var(--accent);
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 24px;
+        }
+
+        .sidebar-logo svg { width: 20px; height: 20px; }
+
+        .sidebar-icon {
+            width: 40px; height: 40px;
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            color: var(--muted);
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .sidebar-icon:hover, .sidebar-icon.active {
+            background: var(--surface2);
+            color: var(--accent);
+            border-color: var(--border);
+        }
+
+        .sidebar-icon svg { width: 18px; height: 18px; }
+
+        /* ── MAIN LAYOUT ── */
+        .main {
+            margin-left: 64px;
+            padding: 32px 40px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ── TOP BAR ── */
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .topbar-left h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: var(--text);
+        }
+
+        .topbar-left .subtitle {
+            font-size: 11px;
+            color: var(--muted);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            padding: 6px 14px;
+            font-size: 11px;
+            color: var(--muted);
+            letter-spacing: 0.05em;
+        }
+
+        .status-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: #2ecc71;
+            box-shadow: 0 0 6px #2ecc71;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .avatar {
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: 13px;
+            color: #000;
+        }
+
+        /* ── ACTION BUTTONS ── */
+        .action-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 36px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            padding: 10px 18px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--muted);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .btn:hover {
+            background: var(--surface2);
+            color: var(--text);
+            border-color: var(--muted2);
+        }
+
+        .btn.btn-accent {
+            background: var(--accent);
+            color: #000;
+            border-color: var(--accent);
+            font-weight: 700;
+        }
+
+        .btn.btn-accent:hover {
+            background: #d4eb3a;
+            box-shadow: 0 0 20px rgba(232,255,71,0.3);
+        }
+
+        .btn.btn-danger {
+            border-color: rgba(255,71,87,0.4);
+            color: var(--danger);
+        }
+
+        .btn.btn-danger:hover {
+            background: rgba(255,71,87,0.1);
+            border-color: var(--danger);
+        }
+
+        .btn svg { width: 13px; height: 13px; }
+
+        /* ── CHARTS GRID ── */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 28px;
+        }
+
+        .chart-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            position: relative;
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+
+        .chart-card:hover { border-color: var(--muted2); }
+
+        .chart-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .chart-card:hover::before { opacity: 1; }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text);
+            letter-spacing: 0.02em;
+        }
+
+        .card-tag {
+            font-size: 9px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            color: var(--muted);
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 180px;
+        }
+
+        .empty-state {
+            height: 180px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--muted);
+            font-size: 11px;
+            gap: 8px;
+            letter-spacing: 0.04em;
+        }
+
+        .empty-state svg {
+            width: 28px; height: 28px;
+            opacity: 0.3;
+        }
+
+        /* ── BOTTOM GRID ── */
+        .bottom-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.4fr;
+            gap: 20px;
+        }
+
+        /* ── BLACKLIST PANEL ── */
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+        }
+
+        .panel-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel-title .dot-danger {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--danger);
+        }
+
+        .panel-desc {
+            font-size: 11px;
+            color: var(--muted);
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .form-input {
+            font-family: 'DM Mono', monospace;
+            font-size: 12px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: var(--text);
+            outline: none;
+            transition: all 0.2s;
+            letter-spacing: 0.02em;
+        }
+
+        .form-input::placeholder { color: var(--muted); }
+
+        .form-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(232,255,71,0.08);
+        }
+
+        .input-label {
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: -4px;
+        }
+
+        /* ── FRAUD OUTPUT ── */
+        .fraud-panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .fraud-output {
+            flex: 1;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px;
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            color: var(--accent2);
+            line-height: 1.7;
+            overflow: auto;
+            max-height: 220px;
+            white-space: pre-wrap;
+            margin-top: 16px;
+        }
+
+        .fraud-output:empty::before {
+            content: '// No data loaded. Click "Load Fraud" above.';
+            color: var(--muted);
+        }
+
+        /* ── DIVIDER ── */
+        .section-divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .section-divider span {
+            font-size: 10px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        .section-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* ── TOAST ── */
+        .toast {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+            color: var(--text);
+            z-index: 1000;
+            transform: translateY(80px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast-icon {
+            width: 20px; height: 20px;
+            background: rgba(46,204,113,0.15);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: #2ecc71;
+            font-size: 10px;
+        }
+
+        /* ── ANIMATIONS ── */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .chart-card, .panel, .fraud-panel {
+            animation: fadeUp 0.4s ease forwards;
+        }
+
+        .chart-card:nth-child(1) { animation-delay: 0.05s; }
+        .chart-card:nth-child(2) { animation-delay: 0.1s; }
+        .chart-card:nth-child(3) { animation-delay: 0.15s; }
+    </style>
 </head>
 <body>
 
-<h1>Admin Dashboard</h1>
+<!-- SIDEBAR -->
+<aside class="sidebar">
+    <div class="sidebar-logo">
+        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="2" width="7" height="7" rx="1.5" fill="#000"/>
+            <rect x="11" y="2" width="7" height="7" rx="1.5" fill="#000" opacity="0.6"/>
+            <rect x="2" y="11" width="7" height="7" rx="1.5" fill="#000" opacity="0.6"/>
+            <rect x="11" y="11" width="7" height="7" rx="1.5" fill="#000" opacity="0.3"/>
+        </svg>
+    </div>
 
-<button onclick="loadOverview()">Load Overview</button>
-<button onclick="loadRisk()">Risk Distribution</button>
-<button onclick="loadDaily()">Daily Transactions</button>
-<button onclick="loadFraud()">Fraud Transactions</button>
+    <div class="sidebar-icon active" title="Dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7" rx="1"/>
+            <rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/>
+            <rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+    </div>
 
-<h2>Blacklist Receiver</h2>
-<input type="text" id="receiverId" placeholder="Receiver ID">
-<input type="text" id="reason" placeholder="Reason">
-<button onclick="blacklist()">Blacklist</button>
+    <div class="sidebar-icon" title="Analytics">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+    </div>
 
-<h2>Overview Chart</h2>
-<canvas id="overviewChart" width="400" height="200"></canvas>
+    <div class="sidebar-icon" title="Transactions">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+            <path d="M2 17l10 5 10-5"/>
+            <path d="M2 12l10 5 10-5"/>
+        </svg>
+    </div>
 
-<h2>Risk Distribution Chart</h2>
-<canvas id="riskChart" width="400" height="200"></canvas>
+    <div class="sidebar-icon" title="Security">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+    </div>
 
-<h2>Daily Transactions Chart</h2>
-<canvas id="dailyChart" width="400" height="200"></canvas>
+    <div class="sidebar-icon" title="Settings" style="margin-top:auto">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+        </svg>
+    </div>
+</aside>
 
-<h2>Fraud Transactions</h2>
-<pre id="fraudOutput"></pre>
+<!-- MAIN -->
+<main class="main">
+
+    <!-- TOP BAR -->
+    <div class="topbar">
+        <div class="topbar-left">
+            <h1>Admin Dashboard</h1>
+            <div class="subtitle">Transaction monitoring &amp; fraud analytics</div>
+        </div>
+        <div class="topbar-right">
+            <div class="status-pill">
+                <div class="status-dot"></div>
+                Systems operational
+            </div>
+            <div class="avatar">AD</div>
+        </div>
+    </div>
+
+    <!-- ACTION BUTTONS -->
+    <div class="action-row">
+        <button class="btn" onclick="loadOverview()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            Load Overview
+        </button>
+        <button class="btn" onclick="loadRisk()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Risk Distribution
+        </button>
+        <button class="btn" onclick="loadDaily()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Daily Transactions
+        </button>
+        <button class="btn btn-danger" onclick="loadFraud()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Load Fraud
+        </button>
+    </div>
+
+    <!-- SECTION LABEL -->
+    <div class="section-divider">
+        <span>Analytics</span>
+    </div>
+
+    <!-- CHARTS GRID -->
+    <div class="charts-grid">
+        <div class="chart-card">
+            <div class="card-header">
+                <div class="card-title">Transaction Overview</div>
+                <div class="card-tag">Bar</div>
+            </div>
+            <div class="chart-container" id="overviewWrap">
+                <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="21" x2="8" y2="15"/><line x1="12" y1="21" x2="12" y2="9"/><line x1="16" y1="21" x2="16" y2="12"/></svg>
+                    Click "Load Overview"
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="card-header">
+                <div class="card-title">Risk Distribution</div>
+                <div class="card-tag">Pie</div>
+            </div>
+            <div class="chart-container" id="riskWrap">
+                <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0110 10"/><path d="M12 12L12 2"/></svg>
+                    Click "Risk Distribution"
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="card-header">
+                <div class="card-title">Daily Transactions</div>
+                <div class="card-tag">Line</div>
+            </div>
+            <div class="chart-container" id="dailyWrap">
+                <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    Click "Daily Transactions"
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECTION LABEL -->
+    <div class="section-divider">
+        <span>Actions</span>
+    </div>
+
+    <!-- BOTTOM GRID -->
+    <div class="bottom-grid">
+
+        <!-- BLACKLIST PANEL -->
+        <div class="panel">
+            <div class="panel-title">
+                <div class="dot-danger"></div>
+                Blacklist Receiver
+            </div>
+            <div class="panel-desc">Flag a receiver ID to restrict future transactions. This action is logged and reversible by a super-admin.</div>
+            <div class="form-group">
+                <label class="input-label">Receiver ID</label>
+                <input class="form-input" type="text" id="receiverId" placeholder="e.g. RCV-00412">
+                <label class="input-label">Reason</label>
+                <input class="form-input" type="text" id="reason" placeholder="e.g. Suspicious activity pattern">
+            </div>
+            <button class="btn btn-accent" onclick="blacklist()" style="width:100%; justify-content:center;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                Blacklist Receiver
+            </button>
+        </div>
+
+        <!-- FRAUD OUTPUT PANEL -->
+        <div class="fraud-panel">
+            <div class="panel-title">
+                <div class="dot-danger"></div>
+                Fraud Transactions Log
+            </div>
+            <div class="panel-desc">Flagged transactions requiring manual review. Data refreshes on each load.</div>
+            <pre class="fraud-output" id="fraudOutput"></pre>
+        </div>
+
+    </div>
+
+</main>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+    <div class="toast-icon">✓</div>
+    <span id="toastMsg">Action completed.</span>
+</div>
 
 <script>
 let overviewChart, riskChart, dailyChart;
 
-// =======================
-// Overview Chart
-// =======================
+Chart.defaults.color = '#5a5f72';
+Chart.defaults.borderColor = '#1f2330';
+Chart.defaults.font.family = "'DM Mono', monospace";
+Chart.defaults.font.size = 11;
+
+const ACCENT   = '#e8ff47';
+const ACCENT2  = '#47c8ff';
+const DANGER   = '#ff4757';
+const SURFACE2 = '#181b22';
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    document.getElementById('toastMsg').textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function makeCanvas(wrapId) {
+    const wrap = document.getElementById(wrapId);
+    wrap.innerHTML = '';
+    const c = document.createElement('canvas');
+    wrap.appendChild(c);
+    return c.getContext('2d');
+}
+
 async function loadOverview() {
     const res = await fetch("/api/analytics/overview");
     const data = await res.json();
-
-    const ctx = document.getElementById('overviewChart').getContext('2d');
-
+    const ctx = makeCanvas('overviewWrap');
     if (overviewChart) overviewChart.destroy();
-
     overviewChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: ['Completed', 'Hold', 'Reversed'],
             datasets: [{
                 label: 'Transactions',
-                data: [data.completed, data.hold, data.reversed]
+                data: [data.completed, data.hold, data.reversed],
+                backgroundColor: [
+                    'rgba(232,255,71,0.8)',
+                    'rgba(71,200,255,0.8)',
+                    'rgba(255,71,87,0.7)'
+                ],
+                borderColor: [ACCENT, ACCENT2, DANGER],
+                borderWidth: 1,
+                borderRadius: 6,
             }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { color: '#1f2330' } },
+                y: { grid: { color: '#1f2330' } }
+            }
         }
     });
+    showToast('Overview loaded');
 }
 
-
-// =======================
-// Risk Distribution Chart
-// =======================
 async function loadRisk() {
     const res = await fetch("/api/analytics/risk-distribution");
     const data = await res.json();
-
-    const ctx = document.getElementById('riskChart').getContext('2d');
-
+    const ctx = makeCanvas('riskWrap');
     if (riskChart) riskChart.destroy();
-
     riskChart = new Chart(ctx, {
-        type: 'pie',
+        type: 'doughnut',
         data: {
             labels: ['Low Risk', 'Medium Risk', 'High Risk'],
             datasets: [{
-                data: [data.low, data.medium, data.high]
+                data: [data.low, data.medium, data.high],
+                backgroundColor: [
+                    'rgba(46,204,113,0.75)',
+                    'rgba(232,255,71,0.75)',
+                    'rgba(255,71,87,0.75)'
+                ],
+                borderColor: ['#2ecc71', ACCENT, DANGER],
+                borderWidth: 1,
+                hoverOffset: 6
             }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '60%',
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: { boxWidth: 10, padding: 12 }
+                }
+            }
         }
     });
+    showToast('Risk distribution loaded');
 }
 
-
-// =======================
-// Daily Transactions Chart
-// =======================
 async function loadDaily() {
     const res = await fetch("/api/analytics/daily-transactions");
     const data = await res.json();
-
     const labels = data.map(d => d._id);
     const counts = data.map(d => d.count);
-
-    const ctx = document.getElementById('dailyChart').getContext('2d');
-
+    const ctx = makeCanvas('dailyWrap');
     if (dailyChart) dailyChart.destroy();
-
     dailyChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: labels,
+            labels,
             datasets: [{
-                label: 'Transactions per Day',
-                data: counts
+                label: 'Transactions',
+                data: counts,
+                borderColor: ACCENT2,
+                backgroundColor: 'rgba(71,200,255,0.08)',
+                borderWidth: 2,
+                pointBackgroundColor: ACCENT2,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                tension: 0.4,
+                fill: true
             }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { color: '#1f2330' } },
+                y: { grid: { color: '#1f2330' } }
+            }
         }
     });
+    showToast('Daily data loaded');
 }
 
-
-// =======================
-// Fraud Transactions
-// =======================
 async function loadFraud() {
     const res = await fetch("/api/admin/fraud");
     const data = await res.json();
-    document.getElementById("fraudOutput").innerText =
-        JSON.stringify(data, null, 2);
+    document.getElementById("fraudOutput").textContent = JSON.stringify(data, null, 2);
+    showToast('Fraud transactions fetched');
 }
 
-
-// =======================
-// Blacklist Receiver
-// =======================
 async function blacklist() {
-    const receiverId = document.getElementById("receiverId").value;
-    const reason = document.getElementById("reason").value;
-
+    const receiverId = document.getElementById("receiverId").value.trim();
+    const reason = document.getElementById("reason").value.trim();
+    if (!receiverId || !reason) {
+        showToast('Please fill in all fields'); return;
+    }
     await fetch("/api/admin/blacklist", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({ receiverId, reason })
     });
-
-    alert("Receiver blacklisted");
+    document.getElementById("receiverId").value = '';
+    document.getElementById("reason").value = '';
+    showToast(`Receiver ${receiverId} blacklisted`);
 }
 </script>
 
