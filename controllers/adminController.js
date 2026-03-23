@@ -1,45 +1,55 @@
 const Transaction = require("../models/transaction");
+const razorpay = require("../config/razorpay");
 const AuditLog = require("../models/AuditLog");
 
-exports.getHolds = async (req, res) => {
-  const holds = await Transaction.find({ status: "HOLD" });
-  res.json(holds);
+exports.forceCapture = async (req, res) => {
+    const { transactionId } = req.body;
+
+    const txn = await Transaction.findById(transactionId);
+
+    if (!txn) return res.status(404).json({ message: "Transaction not found" });
+
+    await razorpay.payments.capture(
+        txn.razorpayPaymentId,
+        txn.amount * 100
+    );
+
+    const prevStatus = txn.status;
+    txn.status = "COMPLETED";
+    await txn.save();
+
+    await AuditLog.create({
+        transactionId: txn._id,
+        action: "ADMIN_FORCE_CAPTURE",
+        previousStatus: prevStatus,
+        newStatus: "COMPLETED",
+        actor: "admin"
+    });
+
+    res.json({ message: "Force captured" });
 };
 
-exports.approveTransaction = async (req, res) => {
-  const transaction = await Transaction.findById(req.params.id);
-  if (!transaction) return res.status(404).json({ msg: "Not found" });
 
-  const prevStatus = transaction.status;
-  transaction.status = "COMPLETED";
-  await transaction.save();
+exports.forceRefund = async (req, res) => {
+    const { transactionId } = req.body;
 
-  await AuditLog.create({
-    transactionId: transaction._id,
-    action: "APPROVED",
-    previousStatus: prevStatus,
-    newStatus: "COMPLETED",
-    actor: "admin",
-  });
+    const txn = await Transaction.findById(transactionId);
 
-  res.json({ message: "Transaction approved" });
-};
+    if (!txn) return res.status(404).json({ message: "Transaction not found" });
 
-exports.rejectTransaction = async (req, res) => {
-  const transaction = await Transaction.findById(req.params.id);
-  if (!transaction) return res.status(404).json({ msg: "Not found" });
+    await razorpay.payments.refund(txn.razorpayPaymentId);
 
-  const prevStatus = transaction.status;
-  transaction.status = "REVERSED";
-  await transaction.save();
+    const prevStatus = txn.status;
+    txn.status = "REVERSED";
+    await txn.save();
 
-  await AuditLog.create({
-    transactionId: transaction._id,
-    action: "REJECTED",
-    previousStatus: prevStatus,
-    newStatus: "REVERSED",
-    actor: "admin",
-  });
+    await AuditLog.create({
+        transactionId: txn._id,
+        action: "ADMIN_FORCE_REFUND",
+        previousStatus: prevStatus,
+        newStatus: "REVERSED",
+        actor: "admin"
+    });
 
-  res.json({ message: "Transaction rejected" });
+    res.json({ message: "Force refunded" });
 };

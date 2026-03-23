@@ -2,19 +2,23 @@ const mongoose = require("mongoose");
 
 const transactionSchema = new mongoose.Schema(
   {
-    userId: { type: String, required: true },
-    amount: { type: Number, required: true },
-    riskScore: { type: Number, default: 0 },
+    userId: String,
+    receiverId: String,
+    amount: Number,
+    riskScore: Number,
 
     status: {
       type: String,
-      enum: ["PENDING", "HOLD", "AUTHORIZED", "COMPLETED", "REVERSED"],
-      default: "PENDING",
+      enum: ["PENDING", "AUTHORIZED", "HOLD", "COMPLETED", "REVERSED"],
+      default: "PENDING"
     },
 
     razorpayOrderId: String,
     razorpayPaymentId: String,
-    razorpaySignature: String,
+
+    holdExpiresAt: Date,
+
+    isFlagged: { type: Boolean, default: false }
   },
   { timestamps: true }
 );

@@ -1,32 +1,120 @@
-const Transaction = require("../models/Transaction");
+const Transaction = require("../models/transaction");
+const razorpay = require("../config/razorpay");
 const AuditLog = require("../models/AuditLog");
-const crypto = require("crypto");
+const Alert = require("../models/Alert");
 
-exports.scheduleAutoRelease = (transactionId) => {
-  setTimeout(async () => {
-    try {
-      const tx = await Transaction.findById(transactionId);
 
-      if (tx && tx.status === "SOFT_HOLD") {
-        tx.status = "COMPLETED";
-        await tx.save();
+// =====================================
+// POLICY ENGINE + SOFT HOLD
+// =====================================
+exports.processSoftHold = async (txn) => {
+  try {
+    console.log("===== POLICY ENGINE START =====");
+    console.log("Risk Score:", txn.riskScore);
 
-        const hash = crypto
-          .createHash("sha256")
-          .update(tx._id + "AUTO_RELEASE" + Date.now())
-          .digest("hex");
+    let prevStatus = txn.status;
 
-        await AuditLog.create({
-          transactionId: tx._id,
-          action: "Auto released after soft hold",
-          hash
-        });
+    // LOW RISK → AUTO COMPLETE
+    if (txn.riskScore < 60) {
+      txn.status = "COMPLETED";
+      txn.isFlagged = false;
 
-        console.log("Auto Released:", tx._id);
-      }
+      await txn.save();
 
-    } catch (err) {
-      console.error("Auto release error:", err);
+      await AuditLog.create({
+        transactionId: txn._id,
+        action: "AUTO_COMPLETED_LOW_RISK",
+        previousStatus: prevStatus,
+        newStatus: "COMPLETED",
+        actor: "system"
+      });
+
+      console.log("LOW RISK → COMPLETED");
     }
-  }, 30 * 1000); // ⚠️ 30 sec for testing (change to 10*60*1000 later)
+
+    // MEDIUM RISK → HOLD
+    else if (txn.riskScore >= 60 && txn.riskScore < 85) {
+      txn.status = "HOLD";
+      txn.isFlagged = true;
+      txn.holdExpiresAt = new Date(Date.now() + 2 * 60 * 1000);
+
+      await txn.save();
+
+      await Alert.create({
+        userId: txn.userId,
+        message: "⚠ High Risk Receiver Detected. Confirm within 2 minutes."
+      });
+
+      await AuditLog.create({
+        transactionId: txn._id,
+        action: "SOFT_HOLD_APPLIED",
+        previousStatus: prevStatus,
+        newStatus: "HOLD",
+        actor: "system"
+      });
+
+      console.log("MEDIUM RISK → HOLD");
+    }
+
+    // HIGH RISK → AUTO REVERSE
+    else {
+      txn.status = "REVERSED";
+      txn.isFlagged = true;
+
+      await txn.save();
+
+      await Alert.create({
+        userId: txn.userId,
+        message: "🚨 Fraudulent Transaction Blocked Automatically."
+      });
+
+      await AuditLog.create({
+        transactionId: txn._id,
+        action: "AUTO_REVERSED_HIGH_RISK",
+        previousStatus: prevStatus,
+        newStatus: "REVERSED",
+        actor: "system"
+      });
+
+      console.log("HIGH RISK → REVERSED");
+    }
+
+    console.log("===== POLICY ENGINE END =====");
+
+  } catch (error) {
+    console.error("Policy Engine Error:", error);
+  }
+};
+
+
+// =====================================
+// HOLD EXPIRY WORKER
+// =====================================
+exports.processExpiredHolds = async () => {
+  try {
+    const expiredTxns = await Transaction.find({
+      status: "HOLD",
+      holdExpiresAt: { $lt: new Date() }
+    });
+
+    for (let txn of expiredTxns) {
+      const prevStatus = txn.status;
+
+      txn.status = "REVERSED";
+      await txn.save();
+
+      await AuditLog.create({
+        transactionId: txn._id,
+        action: "AUTO_REFUND_HOLD_EXPIRED",
+        previousStatus: prevStatus,
+        newStatus: "REVERSED",
+        actor: "system"
+      });
+
+      console.log("Expired HOLD reversed:", txn._id);
+    }
+
+  } catch (error) {
+    console.error("Expired Hold Error:", error);
+  }
 };

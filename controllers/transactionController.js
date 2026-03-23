@@ -1,196 +1,204 @@
-const Razorpay = require("razorpay");
+const razorpay = require("../config/razorpay");
 const Transaction = require("../models/transaction");
 const AuditLog = require("../models/AuditLog");
-const calculateRisk = require("../utils/riskScore");
+const { updateUserProfile } = require("../services/profileService");
+const { createAlert } = require("../services/alertService");
+const { processSoftHold } = require("../services/softHoldService");
+const { calculateRiskScore } = require("../utils/riskScore");
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET
-});
 
-/**
- * 🟢 CREATE TRANSACTION
- * Creates Razorpay order + stores transaction
- */
+// =====================================
+// CREATE TRANSACTION
+// =====================================
 exports.createTransaction = async (req, res) => {
   try {
+    console.log("Create Transaction API called");
+
     const { userId, receiverId, amount } = req.body;
 
-    // ✅ Basic validation
     if (!userId || !amount) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
-    if (amount <= 0) {
-      return res.status(400).json({ message: "Invalid amount" });
-    }
+    // Update profile
+    await updateUserProfile(userId, amount);
 
-    // 🧠 Risk Engine
-    const isNewReceiver = true;
-    const isOddTime = new Date().getHours() < 6;
-    const rapidTransfer = false;
+    // Calculate risk score
+    const riskScore = await calculateRiskScore(userId, receiverId, amount);
 
-    const riskScore = calculateRisk(
-      amount,
-      isNewReceiver,
-      isOddTime,
-      rapidTransfer
-    );
-
-    // 🎯 Status logic
-    let status = riskScore > 50 ? "HOLD" : "PENDING";
-
-    console.log("Creating order for amount:", amount);
-
-    // 💳 Create Razorpay Order
+    // Create Razorpay Order
     const order = await razorpay.orders.create({
       amount: amount * 100,
       currency: "INR",
-      receipt: `receipt_${Date.now()}`
+      receipt: `receipt_${Date.now()}`,
+      payment_capture: 0
     });
 
-    console.log("Order created:", order.id);
-
-    // 💾 Save Transaction in DB
+    // Save transaction
     const transaction = await Transaction.create({
       userId,
       receiverId,
       amount,
       riskScore,
-      status,
+      status: "PENDING",
       razorpayOrderId: order.id
     });
 
-    console.log("Inserted transaction:", transaction._id);
-
-    // 🧾 Audit log
     await AuditLog.create({
       transactionId: transaction._id,
-      action: "CREATED",
+      action: "TRANSACTION_CREATED",
       previousStatus: null,
-      newStatus: status,
+      newStatus: "PENDING",
       actor: "system"
     });
 
     res.json({
-      message: "Order created",
-      orderId: order.id,
-      transactionId: transaction._id,
-      status
-    });
+    message: "Order created",
+    orderId: order.id,
+    transactionId: transaction._id,
+    status: transaction.status,
+    riskScore: transaction.riskScore
+});
 
   } catch (error) {
-    console.error("CREATE TX ERROR:", error);
-    res.status(500).json({
-      message: "Order creation failed",
-      error: error.message
-    });
+    console.error("Create Transaction Error:", error);
+    res.status(500).json({ message: "Order creation failed" });
   }
 };
 
-/**
- * 🟢 SAVE PAYMENT AFTER SUCCESS (Fallback if webhook not used)
- */
+
+// =====================================
+// SAVE PAYMENT AFTER CHECKOUT
+// =====================================
 exports.savePayment = async (req, res) => {
   try {
-    const { orderId, paymentId } = req.body;
+    console.log("===== SAVE PAYMENT START =====");
 
-    const tx = await Transaction.findOne({ razorpayOrderId: orderId });
+    const { paymentId } = req.body;
+    console.log("Payment ID:", paymentId);
+
+    // Find latest pending transaction
+    const tx = await Transaction.findOne({ status: "PENDING" }).sort({ createdAt: -1 });
 
     if (!tx) {
       return res.status(404).json({ message: "Transaction not found" });
     }
 
-    const prevStatus = tx.status;
+    console.log("Transaction found:", tx._id);
 
     tx.razorpayPaymentId = paymentId;
     tx.status = "AUTHORIZED";
     await tx.save();
 
-    await AuditLog.create({
-      transactionId: tx._id,
-      action: "PAYMENT_RECORDED",
-      previousStatus: prevStatus,
-      newStatus: "AUTHORIZED"
+    console.log("Status updated to AUTHORIZED");
+
+    // Run policy engine
+    await processSoftHold(tx);
+
+    console.log("Soft hold processing done");
+
+    res.json({
+      message: "Payment processed",
+      status: tx.status
     });
 
-    console.log("Updated TX:", tx._id);
-
-    res.json({ message: "Payment recorded successfully" });
-
   } catch (error) {
-    console.error("SAVE PAYMENT ERROR:", error);
+    console.error("Save Payment Error:", error);
     res.status(500).json({ message: "Save payment failed" });
   }
 };
 
-/**
- * 🟢 CAPTURE PAYMENT (Admin approval simulation)
- */
-exports.capturePayment = async (req, res) => {
+// CONFIRM PAYMENT
+exports.confirmPayment = async (req, res) => {
   try {
-    const tx = await Transaction.findById(req.params.id);
+    const { transactionId } = req.body;
+    console.log("CONFIRM called for:", transactionId);
 
-    if (!tx) {
+    const txn = await Transaction.findById(transactionId);
+
+    if (!txn) {
       return res.status(404).json({ message: "Transaction not found" });
     }
 
-    const prevStatus = tx.status;
+    if (txn.status !== "HOLD") {
+      return res.json({ message: "Transaction not in HOLD state" });
+    }
 
-    // ✅ Simulated capture (no Razorpay API)
-    tx.status = "COMPLETED";
-    await tx.save();
+    txn.status = "COMPLETED";
+    await txn.save();
 
-    await AuditLog.create({
-      transactionId: tx._id,
-      action: "CAPTURED",
-      previousStatus: prevStatus,
-      newStatus: "COMPLETED",
-      actor: "admin"
-    });
-
-    res.json({
-      message: "Payment captured successfully (simulated)"
-    });
+    res.json({ message: "Payment Confirmed", status: txn.status });
 
   } catch (error) {
-    console.error("CAPTURE ERROR:", error);
-    res.status(500).json({ message: "Capture failed" });
+    console.error("Confirm error:", error);
   }
 };
 
 
-/**
- * 🟢 REFUND PAYMENT
- */
-exports.refundPayment = async (req, res) => {
+// CANCEL PAYMENT
+exports.cancelPayment = async (req, res) => {
   try {
-    const tx = await Transaction.findById(req.params.id);
+    const { transactionId } = req.body;
+    console.log("CANCEL called for:", transactionId);
 
-    if (!tx) {
+    const txn = await Transaction.findById(transactionId);
+
+    if (!txn) {
       return res.status(404).json({ message: "Transaction not found" });
     }
 
-    const prevStatus = tx.status;
+    if (txn.status !== "HOLD") {
+      return res.json({ message: "Transaction not in HOLD state" });
+    }
 
-    // ✅ Simulated refund (no Razorpay call)
-    tx.status = "REVERSED";
-    await tx.save();
+    txn.status = "REVERSED";
+    await txn.save();
 
-    await AuditLog.create({
-      transactionId: tx._id,
-      action: "REFUNDED",
-      previousStatus: prevStatus,
-      newStatus: "REVERSED",
-      actor: "admin"
-    });
+    res.json({ message: "Payment Cancelled", status: txn.status });
+
+  } catch (error) {
+    console.error("Cancel error:", error);
+  }
+};
+
+// =====================================
+// USER HISTORY
+// =====================================
+exports.getUserHistory = async (req, res) => {
+  try {
+    const history = await Transaction.find({
+      userId: req.params.userId
+    }).sort({ createdAt: -1 });
+
+    res.json(history);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to fetch history" });
+  }
+};
+
+
+// =====================================
+// TRANSACTION STATUS
+// =====================================
+exports.getTransactionStatus = async (req, res) => {
+  try {
+    console.log("Status API called for ID:", req.params.id);
+
+    const txn = await Transaction.findById(req.params.id);
+
+    if (!txn) {
+      return res.status(404).json({ message: "Transaction not found" });
+    }
 
     res.json({
-      message: "Payment refunded successfully (simulated)"
+      status: txn.status,
+      riskScore: txn.riskScore || 0,
+      holdExpiresAt: txn.holdExpiresAt || null
     });
 
   } catch (error) {
-    console.error("REFUND ERROR:", error);
-    res.status(500).json({ message: "Refund failed" });
+    console.error("Status Error:", error);
+    res.status(500).json({ message: "Status fetch failed" });
   }
 };

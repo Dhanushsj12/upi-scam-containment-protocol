@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>UPI Fraud Detection Payment</title>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+
+<h2>UPI Payment Test</h2>
+
+<input type="text" id="userId" placeholder="User ID" value="user1"><br><br>
+<input type="text" id="receiverId" placeholder="Receiver ID" value="receiver1"><br><br>
+<input type="number" id="amount" placeholder="Amount" value="15000"><br><br>
+
+<button onclick="startPayment()">Pay Now</button>
+
+<h3 id="status">Status: Not Started</h3>
+<button id="confirmBtn" onclick="confirmPayment()">Confirm Payment</button>
+<button id="cancelBtn" onclick="cancelPayment()">Cancel Payment</button>
+
+<script>
+let transactionId = null;
+let orderIdGlobal = null;
+let statusInterval = null;
+
+
+// ===============================
+// START PAYMENT
+// ===============================
+async function startPayment() {
+    try {
+        const userId = document.getElementById("userId").value;
+        const receiverId = document.getElementById("receiverId").value;
+        const amount = document.getElementById("amount").value;
+
+        document.getElementById("status").innerText = "Creating transaction...";
+
+        const res = await fetch("http://localhost:8000/api/transaction/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId, receiverId, amount })
+        });
+
+        const data = await res.json();
+        console.log("Create Transaction:", data);
+
+        transactionId = data.transactionId;
+        orderIdGlobal = data.orderId;
+
+        document.getElementById("status").innerText =
+            "Transaction Created | Risk Score: " + data.riskScore;
+
+        const options = {
+            key: "rzp_test_SDtnqeeFeS0ztb",
+            amount: amount * 100,
+            currency: "INR",
+            order_id: orderIdGlobal,
+
+            handler: async function (response) {
+
+                document.getElementById("status").innerText =
+                    "Payment Authorized. Processing...";
+
+                const saveRes = await fetch("http://localhost:8000/api/transaction/save-payment", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+        paymentId: response.razorpay_payment_id
+    })
+});
+
+const saveData = await saveRes.json();
+console.log("Save Payment Response:", saveData);
+
+checkStatus();
+startStatusPolling();
+            }
+        };
+
+        const rzp = new Razorpay(options);
+        rzp.open();
+
+    } catch (error) {
+        console.error(error);
+        document.getElementById("status").innerText = "Error starting payment";
+    }
+}
+
+
+// ===============================
+// STATUS POLLING
+// ===============================
+function startStatusPolling() {
+    if (statusInterval) clearInterval(statusInterval);
+
+    statusInterval = setInterval(async () => {
+        await checkStatus();
+    }, 3000);
+}
+
+
+// ===============================
+// CHECK STATUS
+// ===============================
+async function checkStatus() {
+    if (!transactionId) return;
+
+    const res = await fetch(`http://localhost:8000/api/transaction/status/${transactionId}`);
+    const data = await res.json();
+
+    console.log("Status:", data);
+
+    document.getElementById("status").innerText =
+        "Status: " + data.status + " | Risk Score: " + data.riskScore;
+
+    // Enable buttons only when HOLD
+    if (data.status === "HOLD") {
+        document.getElementById("confirmBtn").disabled = false;
+        document.getElementById("cancelBtn").disabled = false;
+    } else {
+        document.getElementById("confirmBtn").disabled = true;
+        document.getElementById("cancelBtn").disabled = true;
+    }
+
+    if (data.status === "COMPLETED" || data.status === "REVERSED") {
+        clearInterval(statusInterval);
+    }
+}
+
+
+// ===============================
+// CONFIRM PAYMENT
+// ===============================
+async function confirmPayment() {
+    if (!transactionId) return;
+
+    const res = await fetch("http://localhost:8000/api/transaction/confirm", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ transactionId })
+    });
+
+    const data = await res.json();
+    console.log(data);
+
+    startStatusPolling();
+}
+
+
+// ===============================
+// CANCEL PAYMENT
+// ===============================
+async function cancelPayment() {
+    if (!transactionId) return;
+
+    const res = await fetch("http://localhost:8000/api/transaction/cancel", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ transactionId })
+    });
+
+    const data = await res.json();
+    console.log(data);
+
+    startStatusPolling();
+}
+</script>
+
+</body>
+</html>

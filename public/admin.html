@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<h1>Admin Dashboard</h1>
+
+<button onclick="loadOverview()">Load Overview</button>
+<button onclick="loadRisk()">Risk Distribution</button>
+<button onclick="loadDaily()">Daily Transactions</button>
+<button onclick="loadFraud()">Fraud Transactions</button>
+
+<h2>Blacklist Receiver</h2>
+<input type="text" id="receiverId" placeholder="Receiver ID">
+<input type="text" id="reason" placeholder="Reason">
+<button onclick="blacklist()">Blacklist</button>
+
+<h2>Overview Chart</h2>
+<canvas id="overviewChart" width="400" height="200"></canvas>
+
+<h2>Risk Distribution Chart</h2>
+<canvas id="riskChart" width="400" height="200"></canvas>
+
+<h2>Daily Transactions Chart</h2>
+<canvas id="dailyChart" width="400" height="200"></canvas>
+
+<h2>Fraud Transactions</h2>
+<pre id="fraudOutput"></pre>
+
+<script>
+let overviewChart, riskChart, dailyChart;
+
+// =======================
+// Overview Chart
+// =======================
+async function loadOverview() {
+    const res = await fetch("/api/analytics/overview");
+    const data = await res.json();
+
+    const ctx = document.getElementById('overviewChart').getContext('2d');
+
+    if (overviewChart) overviewChart.destroy();
+
+    overviewChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Completed', 'Hold', 'Reversed'],
+            datasets: [{
+                label: 'Transactions',
+                data: [data.completed, data.hold, data.reversed]
+            }]
+        }
+    });
+}
+
+
+// =======================
+// Risk Distribution Chart
+// =======================
+async function loadRisk() {
+    const res = await fetch("/api/analytics/risk-distribution");
+    const data = await res.json();
+
+    const ctx = document.getElementById('riskChart').getContext('2d');
+
+    if (riskChart) riskChart.destroy();
+
+    riskChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: ['Low Risk', 'Medium Risk', 'High Risk'],
+            datasets: [{
+                data: [data.low, data.medium, data.high]
+            }]
+        }
+    });
+}
+
+
+// =======================
+// Daily Transactions Chart
+// =======================
+async function loadDaily() {
+    const res = await fetch("/api/analytics/daily-transactions");
+    const data = await res.json();
+
+    const labels = data.map(d => d._id);
+    const counts = data.map(d => d.count);
+
+    const ctx = document.getElementById('dailyChart').getContext('2d');
+
+    if (dailyChart) dailyChart.destroy();
+
+    dailyChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Transactions per Day',
+                data: counts
+            }]
+        }
+    });
+}
+
+
+// =======================
+// Fraud Transactions
+// =======================
+async function loadFraud() {
+    const res = await fetch("/api/admin/fraud");
+    const data = await res.json();
+    document.getElementById("fraudOutput").innerText =
+        JSON.stringify(data, null, 2);
+}
+
+
+// =======================
+// Blacklist Receiver
+// =======================
+async function blacklist() {
+    const receiverId = document.getElementById("receiverId").value;
+    const reason = document.getElementById("reason").value;
+
+    await fetch("/api/admin/blacklist", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ receiverId, reason })
+    });
+
+    alert("Receiver blacklisted");
+}
+</script>
+
+</body>
+</html>

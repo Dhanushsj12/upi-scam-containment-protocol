@@ -1,19 +1,36 @@
-const express = require("express");
-const mongoose = require("mongoose");
 require("dotenv").config();
 
-const app = express();
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+const path = require("path");
 
+const transactionRoutes = require("./routes/transactionRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+const analyticsRoutes = require("./routes/analyticsRoutes");
+const { processExpiredHolds } = require("./services/softHoldService");
+
+const app = express();   // MUST be before app.use()
+
+app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, "public")));
 
-app.use("/webhook", require("./routes/webhookRoutes"));
-app.use("/api/admin", require("./routes/adminRoutes"));
-app.use("/api/transactions", require("./routes/transactionRoutes"));
+// Routes
+app.use("/api/transaction", transactionRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
-mongoose.connect(process.env.MONGO_URI).then(() => {
-  console.log("MongoDB connected");
-});
+// MongoDB
+mongoose.connect(process.env.MONGO_URI)
+.then(() => console.log("MongoDB connected"))
+.catch(err => console.log(err));
 
-app.listen(process.env.PORT, () => {
-  console.log(`Server running on ${process.env.PORT}`);
+// Worker for expired holds
+setInterval(processExpiredHolds, 5000);
+
+// Start server
+const PORT = process.env.PORT || 8000;
+app.listen(PORT, () => {
+    console.log(`Server running on ${PORT}`);
 });
