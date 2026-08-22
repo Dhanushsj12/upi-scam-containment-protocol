@@ -2,7 +2,6 @@ const razorpay = require("../config/razorpay");
 const Transaction = require("../models/transaction");
 const AuditLog = require("../models/AuditLog");
 const { updateUserProfile } = require("../services/profileService");
-const { createAlert } = require("../services/alertService");
 const { processSoftHold } = require("../services/softHoldService");
 const { calculateRiskScore } = require("../utils/riskScore");
 
@@ -16,17 +15,18 @@ exports.createTransaction = async (req, res) => {
 
     const { userId, receiverId, amount } = req.body;
 
-    if (!userId || !amount) {
+    if (!userId || !receiverId || !amount) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
-    // Update profile
+    // Update user profile
     await updateUserProfile(userId, amount);
 
     // Calculate risk score
     const riskScore = await calculateRiskScore(userId, receiverId, amount);
+    console.log("Risk Score Calculated:", riskScore);
 
-    // Create Razorpay Order
+    // Create Razorpay order
     const order = await razorpay.orders.create({
       amount: amount * 100,
       currency: "INR",
@@ -53,12 +53,12 @@ exports.createTransaction = async (req, res) => {
     });
 
     res.json({
-    message: "Order created",
-    orderId: order.id,
-    transactionId: transaction._id,
-    status: transaction.status,
-    riskScore: transaction.riskScore
-});
+      message: "Order created",
+      orderId: order.id,
+      transactionId: transaction._id,
+      status: transaction.status,
+      riskScore: transaction.riskScore
+    });
 
   } catch (error) {
     console.error("Create Transaction Error:", error);
@@ -75,16 +75,14 @@ exports.savePayment = async (req, res) => {
     console.log("===== SAVE PAYMENT START =====");
 
     const { paymentId } = req.body;
-    console.log("Payment ID:", paymentId);
 
-    // Find latest pending transaction
-    const tx = await Transaction.findOne({ status: "PENDING" }).sort({ createdAt: -1 });
+    // Find latest PENDING transaction
+    const tx = await Transaction.findOne({ status: "PENDING" })
+      .sort({ createdAt: -1 });
 
     if (!tx) {
       return res.status(404).json({ message: "Transaction not found" });
     }
-
-    console.log("Transaction found:", tx._id);
 
     tx.razorpayPaymentId = paymentId;
     tx.status = "AUTHORIZED";
@@ -92,10 +90,10 @@ exports.savePayment = async (req, res) => {
 
     console.log("Status updated to AUTHORIZED");
 
-    // Run policy engine
+    // Run policy engine (VERY IMPORTANT)
     await processSoftHold(tx);
 
-    console.log("Soft hold processing done");
+    console.log("Policy engine completed. Final status:", tx.status);
 
     res.json({
       message: "Payment processed",
@@ -108,11 +106,13 @@ exports.savePayment = async (req, res) => {
   }
 };
 
-// CONFIRM PAYMENT
+
+// =====================================
+// CONFIRM HOLD PAYMENT
+// =====================================
 exports.confirmPayment = async (req, res) => {
   try {
     const { transactionId } = req.body;
-    console.log("CONFIRM called for:", transactionId);
 
     const txn = await Transaction.findById(transactionId);
 
@@ -135,11 +135,12 @@ exports.confirmPayment = async (req, res) => {
 };
 
 
-// CANCEL PAYMENT
+// =====================================
+// CANCEL HOLD PAYMENT
+// =====================================
 exports.cancelPayment = async (req, res) => {
   try {
     const { transactionId } = req.body;
-    console.log("CANCEL called for:", transactionId);
 
     const txn = await Transaction.findById(transactionId);
 
@@ -160,6 +161,7 @@ exports.cancelPayment = async (req, res) => {
     console.error("Cancel error:", error);
   }
 };
+
 
 // =====================================
 // USER HISTORY
@@ -183,8 +185,6 @@ exports.getUserHistory = async (req, res) => {
 // =====================================
 exports.getTransactionStatus = async (req, res) => {
   try {
-    console.log("Status API called for ID:", req.params.id);
-
     const txn = await Transaction.findById(req.params.id);
 
     if (!txn) {

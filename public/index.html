@@ -535,8 +535,7 @@ async function startPayment() {
         transactionId = data.transactionId;
         orderIdGlobal = data.orderId;
 
-        setStatus("Created · Risk Score: " + data.riskScore, "");
-
+       setStatus("Transaction Created · Risk Score: " + (data.riskScore ?? 0), "processing");
         const options = {
             key: "rzp_test_SDtnqeeFeS0ztb",
             amount: amount * 100,
@@ -560,9 +559,10 @@ async function startPayment() {
             }
         };
 
-        const rzp = new Razorpay(options);
-        rzp.open();
-
+        setTimeout(() => {
+    const rzp = new Razorpay(options);
+    rzp.open();
+}, 2000);
     } catch (error) {
         console.error(error);
         setStatus("Error starting payment", "reversed");

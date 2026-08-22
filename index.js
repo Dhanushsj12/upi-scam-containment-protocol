@@ -8,9 +8,11 @@ const path = require("path");
 const transactionRoutes = require("./routes/transactionRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
-const { processExpiredHolds } = require("./services/softHoldService");
 
-const app = express();   // MUST be before app.use()
+// Correct worker import
+const { processExpiredHolds } = require("./services/holdExpiryWorker");
+
+const app = express();
 
 app.use(cors());
 app.use(express.json());
@@ -21,12 +23,12 @@ app.use("/api/transaction", transactionRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/analytics", analyticsRoutes);
 
-// MongoDB
+// MongoDB Connection
 mongoose.connect(process.env.MONGO_URI)
 .then(() => console.log("MongoDB connected"))
 .catch(err => console.log(err));
 
-// Worker for expired holds
+// Worker for expired HOLD transactions
 setInterval(processExpiredHolds, 5000);
 
 // Start server
