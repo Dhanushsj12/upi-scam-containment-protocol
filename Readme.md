@@ -554,10 +554,7 @@ upi-scam-backend/
 
 ![Scanner Page](screenshots/Scannerpage.png)
 
----
-## Scanner Page
 
-![Scanner Page](screenshots/Scannerpage.png)
 
 ---
 
