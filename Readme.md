@@ -516,13 +516,13 @@ upi-scam-backend/
 
 ## Payment Page
 
-![Payment Page](screenshots/payment_page.png)
+![Payment Page](screenshots/payment%20page.png)
 
 ---
 
 ## Risk Detection
 
-![Risk Detection](screenshots/risk_detection.png)
+![Risk Detection](screenshots/risk%20detection.png)
 
 ---
 
@@ -534,22 +534,27 @@ upi-scam-backend/
 
 ## Razorpay Integration
 
-![Razorpay Integration](screenshots/razorpay_integration.png)
+![Razorpay Integration](screenshots/razorpay%20integration.png)
 
 ---
 
 ## Transaction Reversal
 
-![Reverse Transaction](screenshots/reversetransaction.jpeg)
+![Transaction Reversal](screenshots/reversetransaction.jpeg)
 
 ---
 
 ## Admin Dashboard
 
-![Admin Dashboard](screenshots/admin_dashboard.png)
+![Admin Dashboard](screenshots/admin%20dashboard.png)
 
 ---
 
+## Scanner Page
+
+![Scanner Page](screenshots/Scannerpage.png)
+
+---
 ## Scanner Page
 
 ![Scanner Page](screenshots/Scannerpage.png)
